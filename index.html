@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library Nexus | Next Generation Digital Library</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/framer-motion@10/dist/framer-motion.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  
+  <style>
+    body { margin: 0; padding: 0; overflow-x: hidden; font-family: 'Poppins', sans-serif; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #000; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #ff4c60, #ff8a00); border-radius: 10px; }
+    .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .pdf-reader-page {
+      background: linear-gradient(135deg, #0a0a0f 0%, #151520 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .pdf-frame {
+      width: 100%;
+      height: 85vh;
+      border: none;
+      background: #1a1a1a;
+      border-radius: 1.5rem;
+    }
+  .reader-minimal {
+    background: #0f1115 !important;
+  }
+
+  .reader-minimal .reader-card {
+    background: #111 !important;
+    border: 1px solid #222 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .reader-minimal .pdf-reader-page {
+    background: #0f1115 !important;
+    padding: 12px !important;
+  }
+
+  .reader-minimal .pdf-frame {
+    border-radius: 6px !important;
+    background: #111 !important;
+  }
+
+  .reader-minimal h1,
+  .reader-minimal h2,
+  .reader-minimal h3,
+  .reader-minimal p {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+    letter-spacing: 0 !important;
+  }
+  </style>
+</head>
+<body class="bg-black">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { motion, AnimatePresence, useInView } = window.Motion;
+
+    const CustomAlert = ({ message, type = 'info', onClose }) => {
+      const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', premium: '🔒' };
+      const colors = { success: 'from-green-500 to-emerald-500', error: 'from-red-500 to-pink-500', warning: 'from-yellow-500 to-orange-500', info: 'from-blue-500 to-cyan-500', premium: 'from-orange-500 to-yellow-500' };
+
+      return (
+        <motion.div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+          <motion.div className="bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 rounded-3xl p-8 max-w-md w-full border-4 border-orange-500/50 relative overflow-hidden" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 180 }} transition={{ type: "spring", stiffness: 200, damping: 20 }} onClick={(e) => e.stopPropagation()}>
+            {[...Array(20)].map((_, i) => (
+              <motion.div key={i} className="absolute w-2 h-2 bg-orange-500 rounded-full" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }} animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0], y: [0, -40] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }} />
+            ))}
+            <motion.div className="text-center relative z-10">
+              <motion.div className="text-7xl mb-4" animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }} transition={{ duration: 0.6 }}>{icons[type]}</motion.div>
+              <motion.div className={`h-1 w-24 mx-auto mb-6 bg-gradient-to-r ${colors[type]} rounded-full`} />
+              <p className="text-xl text-white/90 leading-relaxed mb-6 whitespace-pre-line">{message}</p>
+              <motion.button onClick={onClose} className={`px-8 py-3 bg-gradient-to-r ${colors[type]} rounded-full font-bold text-lg shadow-lg`} whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(255, 138, 0, 0.6)' }} whileTap={{ scale: 0.95 }}>Got it!</motion.button>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      );
+    };
+
+    const RocketToBookAnimation = () => {
+      const [stage, setStage] = useState('rocket');
+      const [currentPage, setCurrentPage] = useState(0);
+
+      const bookPages = [
+        { title: "Welcome to Nexus", content: "Embark on an extraordinary journey through endless knowledge. Your gateway to academic excellence awaits." },
+        { title: "AI-Powered Discovery", content: "Experience intelligent recommendations tailored to your interests. Advanced algorithms understand your patterns." },
+        { title: "Unlimited Access", content: "Access 1200+ premium books anytime, anywhere. Seamless synchronization across all your devices." },
+        { title: "Community Learning", content: "Connect with fellow readers, share insights. Join study groups and vibrant book clubs." },
+        { title: "Your Success", content: "Empowering your educational journey with cutting-edge technology and exceptional resources." }
+      ];
+
+      useEffect(() => {
+        const timer1 = setTimeout(() => setStage('floating'), 1200);
+        const timer2 = setTimeout(() => setStage('book'), 3000);
+        return () => { clearTimeout(timer1); clearTimeout(timer2); };
+      }, []);
+
+      useEffect(() => {
+        if (stage === 'book') {
+          const interval = setInterval(() => {
+            setCurrentPage((prev) => (prev + 1) % bookPages.length);
+          }, 4000);
+          return () => clearInterval(interval);
+        }
+      }, [stage]);
+
+      return (
+        <div className="relative w-full min-h-[700px] flex items-center justify-center overflow-visible">
+          <AnimatePresence mode="wait">
+            {(stage === 'rocket' || stage === 'floating') && (
+              <motion.div key="rocket" className="relative z-50" initial={{ y: 50, opacity: 0, scale: 0.3 }} animate={{ y: stage === 'floating' ? [-5, -15, -5] : 0, opacity: 1, scale: 0.85, rotate: stage === 'floating' ? [0, -2, 2, 0] : 0 }} exit={{ y: -500, x: [0, 30, -30, 0], opacity: 0, scale: 1.3, rotate: [0, 15, -15, 0], transition: { duration: 2, ease: "easeInOut" } }} transition={{ duration: stage === 'floating' ? 2 : 0.8, repeat: stage === 'floating' ? Infinity : 0, ease: "easeInOut" }}>
+                <svg width="200" height="300" viewBox="0 0 200 300" fill="none" style={{ filter: 'drop-shadow(0 0 30px rgba(255, 138, 0, 0.6))' }}>
+                  <motion.path d="M100 20 L130 120 L130 200 L100 220 L70 200 L70 120 Z" fill="none" stroke="#ff8a00" strokeWidth="5" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 1.5 }} />
+                  <motion.path d="M100 10 L120 40 L80 40 Z" fill="none" stroke="#ffd700" strokeWidth="4" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.4 }} />
+                  <motion.path d="M70 140 L50 200 L70 180 Z" fill="none" stroke="#ff8a00" strokeWidth="4" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.8 }} />
+                  <motion.path d="M130 140 L150 200 L130 180 Z" fill="none" stroke="#ff8a00" strokeWidth="4" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.8 }} />
+                  <motion.circle cx="100" cy="80" r="20" fill="none" stroke="#ff8a00" strokeWidth="4" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.2 }} />
+                  <motion.line x1="95" y1="75" x2="105" y2="85" stroke="#ff8a00" strokeWidth="3" />
+                  <motion.line x1="105" y1="75" x2="95" y2="85" stroke="#ff8a00" strokeWidth="3" />
+                  
+                  <motion.g animate={{ opacity: [0.7, 1, 0.7], scaleY: [0.9, 1.4, 0.9] }} transition={{ duration: 0.4, repeat: Infinity }}>
+                    <path d="M100 220 L110 280 L100 260 L90 280 Z" fill="#ff4c60" opacity="0.9" />
+                    <path d="M85 220 L90 270 L80 250 L75 270 Z" fill="#ff8a00" opacity="0.7" />
+                    <path d="M115 220 L120 270 L125 250 L120 270 Z" fill="#ffd700" opacity="0.7" />
+                  </motion.g>
+                </svg>
+
+                {stage === 'floating' && [...Array(15)].map((_, i) => (
+                  <motion.div key={i} className="absolute w-2.5 h-2.5 rounded-full" style={{ left: '50%', bottom: -10 - i * 15, background: ['#ff4c60', '#ff8a00', '#ffd700'][i % 3] }} animate={{ y: [0, 60], opacity: [1, 0], scale: [1.3, 0] }} transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.06 }} />
+                ))}
+              </motion.div>
+            )}
+
+            {stage === 'book' && (
+              <motion.div key="book" className="relative w-full max-w-3xl px-4" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 1.3, ease: [0.34, 1.56, 0.64, 1] }} style={{ perspective: 2500 }}>
+                <div className="relative w-full h-[700px]" style={{ transformStyle: 'preserve-3d' }}>
+                  <motion.div className="absolute -inset-8 rounded-[40px] bg-gradient-to-br from-orange-500/10 via-transparent to-yellow-500/10" animate={{ rotate: [0, 360] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} />
+                  
+                  <div className="absolute inset-0 rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.98))' }}>
+                    <motion.div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255, 138, 0, 0.1) 2px, transparent 2px), linear-gradient(90deg, rgba(255, 138, 0, 0.1) 2px, transparent 2px)', backgroundSize: '50px 50px' }} animate={{ backgroundPosition: ['0px 0px', '50px 50px'] }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} />
+                    
+                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-orange-600 via-orange-500 to-transparent">
+                      <motion.div className="absolute inset-0" animate={{ boxShadow: ['inset 0 0 30px rgba(255, 138, 0, 0.8)', 'inset 0 0 60px rgba(255, 138, 0, 1)', 'inset 0 0 30px rgba(255, 138, 0, 0.8)'] }} transition={{ duration: 2, repeat: Infinity }} />
+                    </div>
+
+                    <div className="absolute top-0 left-0 w-32 h-32">
+                      <motion.div className="absolute inset-0 border-t-4 border-l-4 border-orange-500 rounded-tl-3xl" animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
+                    </div>
+                    <div className="absolute bottom-0 right-0 w-32 h-32">
+                      <motion.div className="absolute inset-0 border-b-4 border-r-4 border-yellow-500 rounded-br-3xl" animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity, delay: 1 }} />
+                    </div>
+
+                    {bookPages.map((page, index) => (
+                      <motion.div key={index} className="absolute inset-0" style={{ transformStyle: 'preserve-3d', transformOrigin: 'left center', zIndex: bookPages.length - index }} animate={{ rotateY: currentPage > index ? -178 : 0 }} transition={{ duration: 1.1, ease: [0.34, 1.56, 0.64, 1] }}>
+                        <div className="absolute inset-0 backface-hidden">
+                          <div className="w-full h-full border-4 border-orange-500/80 rounded-3xl p-14 flex flex-col justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(15, 15, 20, 0.98), rgba(25, 25, 30, 0.95))' }}>
+                            {[...Array(8)].map((_, i) => (
+                              <motion.div key={i} className="absolute w-1 h-1 bg-orange-400 rounded-full" style={{ left: `${20 + i * 10}%`, top: `${30 + i * 5}%` }} animate={{ y: [0, -30, 0], opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity, delay: i * 0.3 }} />
+                            ))}
+                            
+                            <motion.div className="absolute top-10 right-10 flex items-center gap-3">
+                              <motion.div className="w-3 h-3 bg-orange-500 rounded-full" animate={{ scale: [1, 1.5, 1], opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                              <span className="text-orange-400/80 font-['Orbitron'] text-lg font-bold tracking-widest">{String(index + 1).padStart(2, '0')}/{String(bookPages.length).padStart(2, '0')}</span>
+                            </motion.div>
+
+                            <div className="relative z-10 space-y-8">
+                              <motion.div>
+                                <motion.div className="h-2 w-24 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 rounded-full mb-8 shadow-2xl shadow-orange-500/60" animate={{ scaleX: [1, 1.8, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 3, repeat: Infinity }} />
+                                <h3 className="text-6xl md:text-7xl font-black font-['Orbitron'] mb-6" style={{ background: 'linear-gradient(135deg, #ff8a00, #ffd700, #ff8a00)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 20px rgba(255, 138, 0, 0.5))' }}>{page.title}</h3>
+                              </motion.div>
+
+                              <motion.p className="text-2xl md:text-3xl text-white/95 leading-relaxed font-light tracking-wide" animate={{ opacity: currentPage === index ? 1 : 0 }} transition={{ duration: 0.8 }}>{page.content}</motion.p>
+                            </div>
+
+                            <div className="absolute bottom-12 left-14 right-14">
+                              <div className="flex gap-4 justify-center">
+                                {bookPages.map((_, i) => (
+                                  <motion.div key={i} className={`h-2 rounded-full transition-all duration-500 ${i === currentPage ? 'w-20 bg-gradient-to-r from-orange-500 to-yellow-500' : 'w-10 bg-orange-500/30'}`} animate={i === currentPage ? { scale: [1, 1.2, 1] } : {}} transition={{ duration: 1.5, repeat: Infinity }} />
+                                ))}
+                              </div>
+                            </div>
+
+                            <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" initial={{ x: '-100%' }} animate={{ x: '200%' }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }} />
+                          </div>
+                        </div>
+
+                        <div className="absolute inset-0 backface-hidden" style={{ transform: 'rotateY(180deg)' }}>
+                          <div className="w-full h-full bg-gradient-to-bl from-zinc-900 via-zinc-950 to-black border-4 border-yellow-500/70 rounded-3xl p-8 flex items-center justify-center">
+                            <div className="text-center">
+                              <motion.div className="text-7xl mb-8" animate={{ rotateY: 360, scale: [1, 1.3, 1] }} transition={{ duration: 4, repeat: Infinity }}>✨</motion.div>
+                              <p className="text-yellow-400/70 font-['Orbitron'] text-3xl font-bold tracking-[0.3em]">NEXUS</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    <motion.div className="absolute inset-0 rounded-3xl pointer-events-none border-4 border-orange-500/60" animate={{ boxShadow: ['0 0 40px rgba(255, 138, 0, 0.5), inset 0 0 40px rgba(255, 138, 0, 0.2)', '0 0 80px rgba(255, 138, 0, 0.8), inset 0 0 80px rgba(255, 138, 0, 0.4)', '0 0 40px rgba(255, 138, 0, 0.5), inset 0 0 40px rgba(255, 138, 0, 0.2)'] }} transition={{ duration: 3, repeat: Infinity }} />
+                  </div>
+
+                  <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+                    {[...Array(12)].map((_, i) => (
+                      <motion.div key={i} className="absolute w-2 h-2 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full" style={{ left: `${10 + (i % 4) * 25}%`, top: `${10 + Math.floor(i / 4) * 30}%` }} animate={{ y: [0, -50, 0], x: [0, (i % 2 ? 20 : -20), 0], opacity: [0, 0.8, 0], scale: [0, 2, 0] }} transition={{ duration: 4, repeat: Infinity, delay: i * 0.3 }} />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      );
+    };
+
+    const SuccessModal = ({ type, onClose }) => {
+      useEffect(() => { const timer = setTimeout(onClose, 5000); return () => clearTimeout(timer); }, [onClose]);
+      
+      return (
+        <motion.div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+          <motion.div className="bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-3xl p-12 max-w-md w-full border-4 border-orange-500 relative" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 180 }} transition={{ type: "spring", stiffness: 200, damping: 20 }} onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="w-32 h-32 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <motion.div className="text-7xl" animate={{ rotate: 360, scale: [1, 1.2, 1] }} transition={{ duration: 1 }}>{type === 'register' ? '🎉' : '✅'}</motion.div>
+              </div>
+              <motion.h2 className="text-5xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-6" animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 1.2, repeat: Infinity }}>{type === 'register' ? 'Welcome Aboard!' : 'Login Successful!'}</motion.h2>
+              <p className="text-2xl text-white/90 mb-10">{type === 'register' ? 'Your journey begins now' : 'Great to see you again!'}</p>
+              <motion.div className="flex gap-6 justify-center mb-8">
+                {['🚀', '📚', '✨'].map((emoji, i) => (
+                  <motion.div key={i} className="text-5xl" animate={{ y: [0, -15, 0], rotate: [0, 15, -15, 0] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}>{emoji}</motion.div>
+                ))}
+              </motion.div>
+              <motion.button onClick={onClose} className="px-12 py-5 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-bold text-xl" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>Start Exploring</motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      );
+    };
+
+    const PDFViewer = ({ book, onClose }) => {
+  const [minimalMode, setMinimalMode] = React.useState(true);
+  React.useEffect(() => {
+  const container = document.getElementById("pdf-container");
+  if (!container || !book?.pdf || !window.pdfjsLib) return;
+
+  container.innerHTML = "";
+
+  const loadingTask = window.pdfjsLib.getDocument(book.pdf);
+
+  loadingTask.promise.then(async pdf => {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.3 });
+
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport
+      }).promise;
+
+      canvas.className = "mb-6 mx-auto block rounded-lg shadow";
+      container.appendChild(canvas);
+    }
+  });
+}, [book.pdf]);
+
+
+  return (
+    <div className={`pdf-reader-page ${minimalMode ? 'reader-minimal' : ''}`}>
+      <div className="max-w-7xl mx-auto">
+
+        {/* Header */}
+        <div className="reader-card rounded-2xl p-4 mb-4">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <h1 className="text-4xl md:text-5xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent mb-2">
+                {book.title}
+              </h1>
+              <p className="text-white/80 text-xl mb-2">by {book.author}</p>
+              <p className="text-white/60">{book.description}</p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3 flex-wrap items-center">
+              <motion.button
+                onClick={() => setMinimalMode(v => !v)}
+                className="px-5 py-2 rounded-full border border-white/20 text-sm hover:bg-white/10 transition"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {minimalMode ? 'Cinematic UI' : 'Minimal Reader'}
+              </motion.button>
+
+              <motion.a
+                href={book.pdf}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold flex items-center gap-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                📖 Open Full Screen
+              </motion.a>
+
+              <motion.button
+                onClick={onClose}
+                className="px-6 py-3 border-2 border-orange-500 rounded-full font-semibold hover:bg-orange-500/10 transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                ✕ Close Reader
+              </motion.button>
+            </div>
+          </div>
+        </div>
+
+        {/* PDF frame */}
+        <div className="reader-card rounded-2xl p-3">
+          <div
+               id="pdf-container"
+               className="w-full h-[80vh] overflow-y-auto rounded-xl bg-neutral-900 p-4"
+           ></div>
+
+        </div>
+
+        {/* Tip */}
+        <div className="mt-6 text-center">
+          <motion.div
+            className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 inline-block"
+            animate={{ scale: [1, 1.02, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <p className="text-white/70 text-sm">
+              💡 <span className="text-orange-400 font-semibold">Pro Tip:</span>{' '}
+              Click "Open Full Screen" button above for the best reading experience with zoom controls
+            </p>
+          </motion.div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+    const LibraryApp = () => {
+      const [currentView, setCurrentView] = useState('home');
+      const [authModal, setAuthModal] = useState(false);
+      const [isLogin, setIsLogin] = useState(false);
+      const [successModal, setSuccessModal] = useState(null);
+      const [paymentModal, setPaymentModal] = useState(false);
+      const [selectedPlan, setSelectedPlan] = useState(null);
+      const [paymentMethod, setPaymentMethod] = useState('');
+      const [paymentDetails, setPaymentDetails] = useState({ upiId: '', cardNumber: '', cvv: '' });
+      const [userData, setUserData] = useState(null);
+      const [selectedBook, setSelectedBook] = useState(null);
+      const [pdfViewerModal, setPdfViewerModal] = useState(false);
+      const [formData, setFormData] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
+      const [errors, setErrors] = useState({});
+      const [customAlert, setCustomAlert] = useState(null);
+      
+      const cardsRef = useRef(null);
+      const aboutRef = useRef(null);
+      const cardsInView = useInView(cardsRef, { once: true, margin: "-100px" });
+      const aboutInView = useInView(aboutRef, { once: true, margin: "-100px" });
+
+      useEffect(() => {
+        const storedUser = localStorage.getItem('userData');
+        if (storedUser) setUserData(JSON.parse(storedUser));
+      }, []);
+
+      const allBooks = [
+        { id: 1, title: "Quantum Dreams", status: "Free", image: "quantam.png", gradient: "from-orange-500 to-pink-500", author: "Dr. Sarah Chen", description: "Explore the fascinating world of quantum mechanics", pdf: "Quantum_Dreams_Reader.pdf", isFree: true },
+        { id: 2, title: "Arts", status: "Premium", image: "Arts.png", gradient: "from-purple-500 to-orange-500", author: "Prof. Michael Roberts", description: "Deep dive into artificial intelligence and machine learning", pdf: "Quantum_Dreams_Reader.pdf", isFree: false },
+        { id: 3, title: "Digital Futures", status: "Premium", image: "digital.png", gradient: "from-yellow-500 to-red-500", author: "Dr. Emily Zhang", description: "The evolution of technology and society", pdf: "Quantum_Dreams_Reader.pdf", isFree: false },
+        { id: 4, title: "Code Poetry", status: "Premium", image: "codepoerty1.png", gradient: "from-pink-500 to-purple-500", author: "James Anderson", description: "The art and science of beautiful code", pdf: "https://www.africau.edu/images/default/sample.pdf", isFree: false },
+        { id: 5, title: "Cyber Ethics", status: "Premium", image: "cyber1.png", gradient: "from-blue-500 to-teal-500", author: "Dr. Rachel Kim", description: "Ethics in the digital age", pdf: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", isFree: false }
+      ];
+
+      const features = [
+        { icon: <svg className="w-20 h-20" viewBox="0 0 24 24" fill="none" stroke="url(#gradient1)" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="10" y1="8" x2="16" y2="8"/><line x1="10" y1="12" x2="16" y2="12"/><line x1="10" y1="16" x2="14" y2="16"/></svg>, title: "Smart Library", description: "AI-powered search and recommendations for instant book discovery", delay: 0 },
+        { icon: <svg className="w-20 h-20" viewBox="0 0 24 24" fill="none" stroke="url(#gradient2)" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>, title: "Instant Access", description: "Digital-first platform with zero waiting times", delay: 0.2 },
+        { icon: <svg className="w-20 h-20" viewBox="0 0 24 24" fill="none" stroke="url(#gradient3)" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>, title: "Cinematic UI", description: "Immersive interface with cutting-edge design", delay: 0.4 }
+      ];
+
+      const plans = [
+        { name: "Basic", price: 99, description: "Perfect for casual readers", features: ["5 books per month", "Basic search features", "Mobile app access", "Email support"] },
+        { name: "Premium", price: 199, description: "Most popular choice", popular: true, features: ["Unlimited books", "Advanced AI search", "Offline reading", "Priority support", "Exclusive content"] },
+        { name: "Student", price: 149, description: "Special student discount", features: ["10 books per month", "Study resources", "Mobile app access", "Student community", "Notes & highlights"] }
+      ];
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const newErrors = {};
+        if (!formData.fullName.match(/^[a-zA-Z\s]{3,50}$/)) newErrors.fullName = "Name must be 3-50 letters only";
+        if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) newErrors.email = "Invalid email format";
+        if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
+        if (!isLogin && formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords don't match";
+
+        if (Object.keys(newErrors).length === 0) {
+          if (isLogin) {
+            const storedUser = localStorage.getItem('userData');
+            if (storedUser) {
+              const user = JSON.parse(storedUser);
+              if (user.email === formData.email && user.password === formData.password) {
+                setUserData(user);
+                setSuccessModal('login');
+                setAuthModal(false);
+              } else {
+                setErrors({ email: 'Invalid credentials' });
+              }
+            } else {
+              setErrors({ email: 'User not found. Please register first.' });
+            }
+          } else {
+            const user = { ...formData, plan: 'free', hasPaidPlan: false };
+            setUserData(user);
+            localStorage.setItem('userData', JSON.stringify(user));
+            setSuccessModal('register');
+            setAuthModal(false);
+          }
+        } else {
+          setErrors(newErrors);
+        }
+      };
+
+      const handlePlanSelect = (plan) => {
+        if (!userData) {
+          setCustomAlert({ message: 'Please register or login first to choose a plan!', type: 'warning' });
+          setTimeout(() => setAuthModal(true), 2000);
+          return;
+        }
+        setSelectedPlan(plan);
+        setPaymentModal(true);
+      };
+
+      const processPayment = () => {
+        if (!paymentMethod) { setCustomAlert({ message: 'Please select a payment method!', type: 'warning' }); return; }
+        if (paymentMethod === 'UPI' && !paymentDetails.upiId) { setCustomAlert({ message: 'Please enter your UPI ID!', type: 'warning' }); return; }
+        if (paymentMethod === 'Card' && (!paymentDetails.cardNumber || !paymentDetails.cvv)) { setCustomAlert({ message: 'Please enter complete card details!', type: 'warning' }); return; }
+        
+        const updatedUser = { ...userData, plan: selectedPlan.name.toLowerCase(), hasPaidPlan: true };
+        setUserData(updatedUser);
+        localStorage.setItem('userData', JSON.stringify(updatedUser));
+        setPaymentModal(false);
+        setCustomAlert({ message: `Payment Successful! 🎉\n\nPlan: ${selectedPlan.name}\nAmount: ₹${selectedPlan.price}\n\nYou now have unlimited access to all books!`, type: 'success' });
+        setPaymentMethod('');
+        setPaymentDetails({ upiId: '', cardNumber: '', cvv: '' });
+      };
+
+      const handleBookClick = (book) => {
+        if (!userData) {
+          setCustomAlert({ message: 'Please register or login to access books!', type: 'info' });
+          setTimeout(() => { setAuthModal(true); setIsLogin(false); }, 2000);
+          return;
+        }
+
+        if (book.isFree || userData.hasPaidPlan) {
+          setSelectedBook(book);
+          setPdfViewerModal(true);
+        } else {
+          setCustomAlert({ message: 'This is a premium book! 🔒\n\nPlease subscribe to a paid plan to unlock unlimited access.', type: 'premium' });
+          setTimeout(() => {
+            setCurrentView('home');
+            setTimeout(() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }), 100);
+          }, 2500);
+        }
+      };
+
+      if (pdfViewerModal && selectedBook) {
+        return <PDFViewer book={selectedBook} onClose={() => setPdfViewerModal(false)} />;
+      }
+
+      return (
+        <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+          <svg width="0" height="0" className="absolute">
+            <defs>
+              <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#ff4c60" /><stop offset="50%" stopColor="#ff8a00" /><stop offset="100%" stopColor="#ffd700" /></linearGradient>
+              <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#ff8a00" /><stop offset="100%" stopColor="#ffd700" /></linearGradient>
+              <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#ffd700" /><stop offset="100%" stopColor="#ff4c60" /></linearGradient>
+            </defs>
+          </svg>
+
+          <motion.header initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 1 }} className="fixed top-0 w-full bg-black/80 backdrop-blur-3xl border-b border-orange-500/20 z-50">
+            <div className="max-w-7xl mx-auto px-8 py-6 flex justify-between items-center">
+              <motion.h1 onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-3xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent cursor-pointer bg-[length:200%_100%]" animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }}>NEXUS</motion.h1>
+              <nav className="flex gap-8 items-center">
+                {currentView === 'home' ? (
+                  <>
+                    {['Home', 'About', 'Books', 'Pricing'].map((item) => (
+                      <motion.a key={item} href={`#${item.toLowerCase()}`} className="text-sm font-medium hover:text-orange-500 transition-colors" whileHover={{ y: -2 }}>{item}</motion.a>
+                    ))}
+                  </>
+                ) : (
+                  <button onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-sm font-medium hover:text-orange-500 transition-colors">← Back to Home</button>
+                )}
+                {userData ? (
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-orange-500">Hi, {userData.fullName.split(' ')[0]}!</span>
+                    <motion.button onClick={() => { setUserData(null); localStorage.removeItem('userData'); setCurrentView('home'); }} className="px-6 py-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-full font-semibold text-sm" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Logout</motion.button>
+                  </div>
+                ) : (
+                  <motion.button onClick={() => { setAuthModal(true); setIsLogin(true); }} className="px-6 py-2 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Login</motion.button>
+                )}
+              </nav>
+            </div>
+          </motion.header>
+
+          {currentView === 'home' && (
+            <>
+              <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden">
+                <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-50">
+                  <source src="libraryshort.mp4" type="video/mp4" />
+                </video>
+                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black" />
+                <motion.div className="relative z-10 text-center max-w-5xl px-8" initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }}>
+                  <h2 className="text-7xl md:text-8xl font-black font-['Orbitron'] mb-6 leading-tight">
+                    <span className="bg-gradient-to-r from-white via-orange-500 to-yellow-500 bg-clip-text text-transparent bg-[length:200%_100%]" style={{ animation: 'gradient 6s ease infinite' }}>Discover Knowledge<br />In a New Dimension</span>
+                  </h2>
+                  <motion.p className="text-2xl text-white/80 mb-12 font-light tracking-wide" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.8 }}>Experience the future of digital libraries from anywhere</motion.p>
+                  <motion.div className="flex gap-6 justify-center flex-wrap" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 1 }}>
+                    <motion.button onClick={() => { setAuthModal(true); setIsLogin(false); }} className="px-12 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold text-lg" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Get Started</motion.button>
+                    <motion.a href="#about" className="px-12 py-4 border-2 border-orange-500 rounded-full font-semibold text-lg hover:bg-orange-500/10 transition-colors" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Learn More</motion.a>
+                  </motion.div>
+                </motion.div>
+              </section>
+
+              <section id="about" ref={cardsRef} className="relative py-32 px-8">
+                <motion.h2 className="text-6xl font-black font-['Orbitron'] text-center mb-20" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 1 }}>Why Students Choose Us</motion.h2>
+                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
+                  {features.map((feature, index) => (
+                    <motion.div key={index} className="group relative bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-xl rounded-3xl p-12 border border-orange-500/20 overflow-hidden" initial={{ opacity: 0, x: index === 0 ? -200 : index === 1 ? 0 : 200, y: index === 1 ? -200 : 100, rotateY: index === 0 ? -90 : index === 2 ? 90 : 0, scale: 0.7 }} animate={cardsInView ? { opacity: 1, x: 0, y: 0, rotateY: 0, scale: 1, transition: { type: "spring", stiffness: 80, damping: 15, delay: feature.delay, duration: 1.2 } } : {}} whileHover={{ y: -20, scale: 1.05, transition: { duration: 0.4 } }} style={{ perspective: 1000 }}>
+                      <motion.div className="absolute inset-0 bg-gradient-to-br from-orange-500/0 via-orange-500/10 to-yellow-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <div className="relative z-10">
+                        <motion.div className="mb-8" animate={cardsInView ? { rotate: [0, 360], scale: [0, 1.2, 1], transition: { delay: feature.delay + 0.5, duration: 1 } } : {}} whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }} transition={{ duration: 0.6 }}>{feature.icon}</motion.div>
+                        <h3 className="text-3xl font-bold text-orange-500 mb-4 font-['Orbitron']">{feature.title}</h3>
+                        <p className="text-lg text-white/70 leading-relaxed">{feature.description}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </section>
+
+              <section ref={aboutRef} className="relative py-32 px-8 overflow-hidden">
+                <motion.h2 className="text-6xl md:text-7xl font-black font-['Orbitron'] text-center mb-20 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent" initial={{ opacity: 0, scale: 0.8 }} animate={aboutInView ? { opacity: 1, scale: 1 } : {}} transition={{ duration: 1 }}>About Our Library</motion.h2>
+                <div className="max-w-7xl mx-auto flex justify-center">{aboutInView && <RocketToBookAnimation />}</div>
+              </section>
+
+              <section id="books" className="relative py-32 px-8">
+                <motion.h2 className="text-6xl font-black font-['Orbitron'] text-center mb-20" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>Popular Books</motion.h2>
+                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
+                  {allBooks.slice(0, 6).map((book, index) => (
+                    <motion.div key={index} className="group relative rounded-3xl overflow-hidden aspect-[3/4] cursor-pointer" initial={{ opacity: 0, rotateY: 90, scale: 0.8 }} whileInView={{ opacity: 1, rotateY: 0, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: index * 0.1 }} whileHover={{ scale: 1.05, rotateZ: 2 }} onClick={() => { setCurrentView('books'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                      <motion.img src={book.image} alt={book.title} className="absolute inset-0 w-full h-full object-cover" whileHover={{ scale: 1.3 }} transition={{ duration: 0.8 }} />
+                      <motion.div className={`absolute inset-0 bg-gradient-to-t ${book.gradient} opacity-0 group-hover:opacity-40 transition-opacity duration-500 mix-blend-multiply`} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-8">
+                        <h3 className="text-2xl font-bold mb-2">{book.title}</h3>
+                        <p className={`font-semibold ${book.isFree ? 'text-green-500' : 'text-orange-500'}`}>{book.status}</p>
+                      </div>
+                      <motion.div className="absolute inset-0 border-2 border-transparent group-hover:border-orange-500 rounded-3xl transition-all duration-500" whileHover={{ boxShadow: '0 0 40px rgba(255, 138, 0, 0.6)' }} />
+                    </motion.div>
+                  ))}
+                </div>
+                <motion.div className="text-center mt-16">
+                  <motion.button onClick={() => { setCurrentView('books'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-12 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold text-lg" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>View All Books</motion.button>
+                </motion.div>
+              </section>
+
+              <section id="pricing" className="relative py-32 px-8">
+                <motion.h2 className="text-6xl font-black font-['Orbitron'] text-center mb-20" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>Membership Plans</motion.h2>
+                <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
+                  {plans.map((plan, index) => (
+                    <motion.div key={index} className={`relative bg-zinc-900/50 backdrop-blur-xl rounded-3xl p-10 border-2 ${plan.popular ? 'border-orange-500 scale-105' : 'border-orange-500/20'} overflow-hidden`} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} whileHover={{ y: -10, scale: plan.popular ? 1.07 : 1.05 }}>
+                      {plan.popular && <div className="absolute top-6 right-6 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-4 py-1 rounded-full text-sm font-bold">POPULAR</div>}
+                      <h3 className="text-3xl font-bold text-orange-500 mb-4 font-['Orbitron']">{plan.name}</h3>
+                      <div className="text-5xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-2">₹{plan.price}<span className="text-2xl">/mo</span></div>
+                      <p className="text-white/60 mb-8">{plan.description}</p>
+                      <ul className="space-y-3 mb-8">{plan.features.map((feature, i) => <li key={i} className="flex items-start text-white/80"><span className="text-orange-500 mr-2 text-xl">✓</span>{feature}</li>)}</ul>
+                      <motion.button onClick={() => handlePlanSelect(plan)} className="w-full py-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Choose Plan</motion.button>
+                    </motion.div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {currentView === 'books' && (
+            <section className="relative min-h-screen pt-32 pb-16 px-8">
+              <motion.h2 className="text-6xl font-black font-['Orbitron'] text-center mb-8 bg-gradient-to-r from-orange-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent" initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>All Books</motion.h2>
+              <motion.p className="text-center text-white/70 text-xl mb-16" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>{userData?.hasPaidPlan ? 'Enjoy unlimited access to all books!' : 'Click on a book to read. Premium books require a subscription.'}</motion.p>
+              <div className="max-w-7xl mx-auto grid md:grid-cols-3 lg:grid-cols-4 gap-8">
+                {allBooks.map((book, index) => (
+                  <motion.div key={book.id} className="group relative rounded-3xl overflow-hidden aspect-[3/4] cursor-pointer" initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} whileHover={{ scale: 1.05, y: -10 }} onClick={() => handleBookClick(book)}>
+                    <motion.img src={book.image} alt={book.title} className="absolute inset-0 w-full h-full object-cover" whileHover={{ scale: 1.2 }} transition={{ duration: 0.8 }} />
+                    <motion.div className={`absolute inset-0 bg-gradient-to-t ${book.gradient} opacity-0 group-hover:opacity-40 transition-opacity duration-500 mix-blend-multiply`} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                    {book.isFree && <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">FREE</div>}
+                    {!book.isFree && !userData?.hasPaidPlan && <div className="absolute top-4 right-4 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">🔒 PREMIUM</div>}
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <h3 className="text-xl font-bold mb-1">{book.title}</h3>
+                      <p className="text-sm text-white/70 mb-2">{book.author}</p>
+                      <p className="text-xs text-white/60 line-clamp-2">{book.description}</p>
+                    </div>
+                    <motion.div className="absolute inset-0 border-2 border-transparent group-hover:border-orange-500 rounded-3xl transition-all duration-500" whileHover={{ boxShadow: '0 0 40px rgba(255, 138, 0, 0.6)' }} />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <AnimatePresence>
+            {authModal && (
+              <motion.div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAuthModal(false)}>
+                <motion.div className="bg-zinc-900/90 backdrop-blur-xl rounded-3xl p-10 max-w-md w-full border-2 border-orange-500/30 relative" initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 50 }} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => setAuthModal(false)} className="absolute top-4 right-4 text-3xl text-orange-500 hover:rotate-90 transition-transform">×</button>
+                  <h2 className="text-3xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-8">{isLogin ? 'Welcome Back' : 'Join Library'}</h2>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {!isLogin && (
+                      <div><label className="block mb-2 text-sm text-white/80">Full Name</label><input type="text" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} />{errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}</div>
+                    )}
+                    <div><label className="block mb-2 text-sm text-white/80">Email</label><input type="email" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />{errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}</div>
+                    <div><label className="block mb-2 text-sm text-white/80">Password</label><input type="password" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />{errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}</div>
+                    {!isLogin && <div><label className="block mb-2 text-sm text-white/80">Confirm Password</label><input type="password" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} />{errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}</div>}
+                    <motion.button type="submit" className="w-full py-3 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>{isLogin ? 'Login' : 'Register'}</motion.button>
+                  </form>
+                  <p className="text-center text-white/60 mt-6">{isLogin ? "Don't have an account? " : "Already have an account? "}<button onClick={() => { setIsLogin(!isLogin); setErrors({}); }} className="text-orange-500 hover:underline">{isLogin ? 'Register' : 'Login'}</button></p>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {paymentModal && selectedPlan && (
+              <motion.div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 flex items-center justify-center p-4 overflow-y-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPaymentModal(false)}>
+                <motion.div className="bg-zinc-900/90 backdrop-blur-xl rounded-3xl p-10 max-w-lg w-full border-2 border-orange-500/30 relative my-8" initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 50 }} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => setPaymentModal(false)} className="absolute top-4 right-4 text-3xl text-orange-500 hover:rotate-90 transition-transform">×</button>
+                  <h2 className="text-3xl font-black font-['Orbitron'] bg-gradient-to-r from-orange-500 to-yellow-500 bg-clip-text text-transparent mb-8">Complete Payment</h2>
+                  <div className="bg-white/5 rounded-2xl p-6 mb-6 border border-orange-500/20">
+                    <h3 className="text-xl font-bold text-orange-500 mb-4">Order Summary</h3>
+                    <div className="space-y-2 text-white/80">
+                      <div className="flex justify-between"><span>Plan:</span><span className="font-semibold">{selectedPlan.name}</span></div>
+                      <div className="flex justify-between"><span>Duration:</span><span>1 Month</span></div>
+                      <div className="flex justify-between border-t border-orange-500/30 pt-2 mt-2 text-xl font-bold text-orange-500"><span>Total:</span><span>₹{selectedPlan.price}</span></div>
+                    </div>
+                  </div>
+                  <h4 className="text-lg font-semibold mb-4">Select Payment Method</h4>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {['UPI', 'Card', 'NetBanking', 'Wallet'].map((method) => (
+                      <motion.button key={method} onClick={() => setPaymentMethod(method)} className={`p-4 rounded-xl border-2 transition-all font-semibold ${paymentMethod === method ? 'border-orange-500 bg-orange-500/20' : 'border-orange-500/20 bg-white/5'}`} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>{method}</motion.button>
+                    ))}
+                  </div>
+                  {paymentMethod === 'UPI' && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-3">
+                      <label className="block text-sm text-white/80">UPI ID</label>
+                      <input type="text" placeholder="yourname@upi" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.upiId} onChange={(e) => setPaymentDetails({...paymentDetails, upiId: e.target.value})} />
+                    </motion.div>
+                  )}
+                  {paymentMethod === 'Card' && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-3">
+                      <div><label className="block text-sm text-white/80 mb-2">Card Number</label><input type="text" placeholder="1234 5678 9012 3456" maxLength="19" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.cardNumber} onChange={(e) => setPaymentDetails({...paymentDetails, cardNumber: e.target.value})} /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><label className="block text-sm text-white/80 mb-2">Expiry</label><input type="text" placeholder="MM/YY" maxLength="5" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" /></div>
+                        <div><label className="block text-sm text-white/80 mb-2">CVV</label><input type="text" placeholder="123" maxLength="3" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.cvv} onChange={(e) => setPaymentDetails({...paymentDetails, cvv: e.target.value})} /></div>
+                      </div>
+                    </motion.div>
+                  )}
+                  <motion.button onClick={processPayment} className="w-full py-4 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-bold text-lg shadow-lg" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>Pay ₹{selectedPlan.price}</motion.button>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {successModal && <SuccessModal type={successModal} onClose={() => setSuccessModal(null)} />}
+            {customAlert && <CustomAlert message={customAlert.message} type={customAlert.type} onClose={() => setCustomAlert(null)} />}
+          </AnimatePresence>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<LibraryApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>
