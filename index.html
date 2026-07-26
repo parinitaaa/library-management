@@ -379,8 +379,8 @@
       const aboutInView = useInView(aboutRef, { once: true, margin: "-100px" });
 
       useEffect(() => {
-        const storedUser = localStorage.getItem('userData');
-        if (storedUser) setUserData(JSON.parse(storedUser));
+        const activeUser = sessionStorage.getItem('activeUser');
+        if (activeUser) setUserData(JSON.parse(activeUser));
       }, []);
 
       const allBooks = [
@@ -406,7 +406,7 @@
       const handleSubmit = (e) => {
         e.preventDefault();
         const newErrors = {};
-        if (!formData.fullName.match(/^[a-zA-Z\s]{3,50}$/)) newErrors.fullName = "Name must be 3-50 letters only";
+        if (!isLogin && !formData.fullName.match(/^[a-zA-Z\s]{3,50}$/)) newErrors.fullName = "Name must be 3-50 letters only";
         if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) newErrors.email = "Invalid email format";
         if (formData.password.length < 6) newErrors.password = "Password must be at least 6 characters";
         if (!isLogin && formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords don't match";
@@ -418,6 +418,7 @@
               const user = JSON.parse(storedUser);
               if (user.email === formData.email && user.password === formData.password) {
                 setUserData(user);
+                sessionStorage.setItem('activeUser', JSON.stringify(user));
                 setSuccessModal('login');
                 setAuthModal(false);
               } else {
@@ -430,6 +431,7 @@
             const user = { ...formData, plan: 'free', hasPaidPlan: false };
             setUserData(user);
             localStorage.setItem('userData', JSON.stringify(user));
+            sessionStorage.setItem('activeUser', JSON.stringify(user));
             setSuccessModal('register');
             setAuthModal(false);
           }
@@ -456,6 +458,7 @@
         const updatedUser = { ...userData, plan: selectedPlan.name.toLowerCase(), hasPaidPlan: true };
         setUserData(updatedUser);
         localStorage.setItem('userData', JSON.stringify(updatedUser));
+        sessionStorage.setItem('activeUser', JSON.stringify(updatedUser));
         setPaymentModal(false);
         setCustomAlert({ message: `Payment Successful! 🎉\n\nPlan: ${selectedPlan.name}\nAmount: ₹${selectedPlan.price}\n\nYou now have unlimited access to all books!`, type: 'success' });
         setPaymentMethod('');
@@ -511,7 +514,7 @@
                 {userData ? (
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-orange-500">Hi, {userData.fullName.split(' ')[0]}!</span>
-                    <motion.button onClick={() => { setUserData(null); localStorage.removeItem('userData'); setCurrentView('home'); }} className="px-6 py-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-full font-semibold text-sm" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Logout</motion.button>
+                    <motion.button onClick={() => { setUserData(null); sessionStorage.removeItem('activeUser'); setCurrentView('home'); }} className="px-6 py-2 bg-gradient-to-r from-red-500 to-orange-500 rounded-full font-semibold text-sm" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Logout</motion.button>
                   </div>
                 ) : (
                   <motion.button onClick={() => { setAuthModal(true); setIsLogin(true); }} className="px-6 py-2 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-semibold" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Login</motion.button>
