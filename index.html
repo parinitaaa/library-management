@@ -365,7 +365,7 @@
       const [paymentModal, setPaymentModal] = useState(false);
       const [selectedPlan, setSelectedPlan] = useState(null);
       const [paymentMethod, setPaymentMethod] = useState('');
-      const [paymentDetails, setPaymentDetails] = useState({ upiId: '', cardNumber: '', cvv: '' });
+      const [paymentDetails, setPaymentDetails] = useState({ upiId: '', cardNumber: '', cvv: '', expiryDate: '', netbankingBank: '', walletNumber: '' });
       const [userData, setUserData] = useState(null);
       const [selectedBook, setSelectedBook] = useState(null);
       const [pdfViewerModal, setPdfViewerModal] = useState(false);
@@ -385,10 +385,10 @@
 
       const allBooks = [
         { id: 1, title: "Quantum Dreams", status: "Free", image: "quantam.png", gradient: "from-orange-500 to-pink-500", author: "Dr. Sarah Chen", description: "Explore the fascinating world of quantum mechanics", pdf: "Quantum_Dreams_Reader.pdf", isFree: true },
-        { id: 2, title: "Arts", status: "Premium", image: "Arts.png", gradient: "from-purple-500 to-orange-500", author: "Prof. Michael Roberts", description: "Deep dive into artificial intelligence and machine learning", pdf: "Quantum_Dreams_Reader.pdf", isFree: false },
-        { id: 3, title: "Digital Futures", status: "Premium", image: "digital.png", gradient: "from-yellow-500 to-red-500", author: "Dr. Emily Zhang", description: "The evolution of technology and society", pdf: "Quantum_Dreams_Reader.pdf", isFree: false },
-        { id: 4, title: "Code Poetry", status: "Premium", image: "codepoerty1.png", gradient: "from-pink-500 to-purple-500", author: "James Anderson", description: "The art and science of beautiful code", pdf: "Quantum_Dreams_Reader.pdf", isFree: false },
-        { id: 5, title: "Cyber Ethics", status: "Premium", image: "cyber1.png", gradient: "from-blue-500 to-teal-500", author: "Dr. Rachel Kim", description: "Ethics in the digital age", pdf: "Quantum_Dreams_Reader.pdf", isFree: false }
+        { id: 2, title: "Arts", status: "Premium", image: "Arts.png", gradient: "from-purple-500 to-orange-500", author: "Prof. Michael Roberts", description: "Deep dive into artificial intelligence and machine learning", isFree: false },
+        { id: 3, title: "Digital Futures", status: "Premium", image: "digital.png", gradient: "from-yellow-500 to-red-500", author: "Dr. Emily Zhang", description: "The evolution of technology and society", isFree: false },
+        { id: 4, title: "Code Poetry", status: "Premium", image: "codepoerty1.png", gradient: "from-pink-500 to-purple-500", author: "James Anderson", description: "The art and science of beautiful code", isFree: false },
+        { id: 5, title: "Cyber Ethics", status: "Premium", image: "cyber1.png", gradient: "from-blue-500 to-teal-500", author: "Dr. Rachel Kim", description: "Ethics in the digital age", isFree: false }
       ];
 
       const features = [
@@ -453,7 +453,14 @@
       const processPayment = () => {
         if (!paymentMethod) { setCustomAlert({ message: 'Please select a payment method!', type: 'warning' }); return; }
         if (paymentMethod === 'UPI' && !paymentDetails.upiId) { setCustomAlert({ message: 'Please enter your UPI ID!', type: 'warning' }); return; }
-        if (paymentMethod === 'Card' && (!paymentDetails.cardNumber || !paymentDetails.cvv)) { setCustomAlert({ message: 'Please enter complete card details!', type: 'warning' }); return; }
+        if (paymentMethod === 'Card') {
+          if (!paymentDetails.cardNumber || !paymentDetails.cvv || !paymentDetails.expiryDate) { setCustomAlert({ message: 'Please enter complete card details!', type: 'warning' }); return; }
+          if (!/^\d{16}$/.test(paymentDetails.cardNumber.replace(/\s/g, ''))) { setCustomAlert({ message: 'Invalid card number! Must be 16 digits.', type: 'warning' }); return; }
+          if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(paymentDetails.expiryDate)) { setCustomAlert({ message: 'Invalid expiry date! Format should be MM/YY', type: 'warning' }); return; }
+          if (!/^\d{3,4}$/.test(paymentDetails.cvv)) { setCustomAlert({ message: 'Invalid CVV! Must be 3 or 4 digits.', type: 'warning' }); return; }
+        }
+        if (paymentMethod === 'NetBanking' && !paymentDetails.netbankingBank) { setCustomAlert({ message: 'Please select a bank!', type: 'warning' }); return; }
+        if (paymentMethod === 'Wallet' && !/^\d{10}$/.test(paymentDetails.walletNumber)) { setCustomAlert({ message: 'Please enter a valid 10-digit wallet number!', type: 'warning' }); return; }
         
         const updatedUser = { ...userData, plan: selectedPlan.name.toLowerCase(), hasPaidPlan: true };
         setUserData(updatedUser);
@@ -462,7 +469,7 @@
         setPaymentModal(false);
         setCustomAlert({ message: `Payment Successful! 🎉\n\nPlan: ${selectedPlan.name}\nAmount: ₹${selectedPlan.price}\n\nYou now have unlimited access to all books!`, type: 'success' });
         setPaymentMethod('');
-        setPaymentDetails({ upiId: '', cardNumber: '', cvv: '' });
+        setPaymentDetails({ upiId: '', cardNumber: '', cvv: '', expiryDate: '', netbankingBank: '', walletNumber: '' });
       };
 
       const handleBookClick = (book) => {
@@ -472,9 +479,11 @@
           return;
         }
 
-        if (book.isFree || userData.hasPaidPlan) {
+        if (book.id === 1) {
           setSelectedBook(book);
           setPdfViewerModal(true);
+        } else if (userData.hasPaidPlan) {
+          setCustomAlert({ message: 'Premium content is currently being updated. Coming soon! 🚀', type: 'info' });
         } else {
           setCustomAlert({ message: 'This is a premium book! 🔒\n\nPlease subscribe to a paid plan to unlock unlimited access.', type: 'premium' });
           setTimeout(() => {
@@ -675,9 +684,27 @@
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-3">
                       <div><label className="block text-sm text-white/80 mb-2">Card Number</label><input type="text" placeholder="1234 5678 9012 3456" maxLength="19" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.cardNumber} onChange={(e) => setPaymentDetails({...paymentDetails, cardNumber: e.target.value})} /></div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div><label className="block text-sm text-white/80 mb-2">Expiry</label><input type="text" placeholder="MM/YY" maxLength="5" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" /></div>
+                        <div><label className="block text-sm text-white/80 mb-2">Expiry</label><input type="text" placeholder="MM/YY" maxLength="5" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.expiryDate} onChange={(e) => setPaymentDetails({...paymentDetails, expiryDate: e.target.value})} /></div>
                         <div><label className="block text-sm text-white/80 mb-2">CVV</label><input type="text" placeholder="123" maxLength="3" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.cvv} onChange={(e) => setPaymentDetails({...paymentDetails, cvv: e.target.value})} /></div>
                       </div>
+                    </motion.div>
+                  )}
+                  {paymentMethod === 'NetBanking' && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-3">
+                      <label className="block text-sm text-white/80">Select Bank</label>
+                      <select className="w-full bg-zinc-900 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors text-white" value={paymentDetails.netbankingBank} onChange={(e) => setPaymentDetails({...paymentDetails, netbankingBank: e.target.value})}>
+                        <option value="">Choose a bank...</option>
+                        <option value="HDFC">HDFC Bank</option>
+                        <option value="SBI">State Bank of India</option>
+                        <option value="ICICI">ICICI Bank</option>
+                        <option value="Axis">Axis Bank</option>
+                      </select>
+                    </motion.div>
+                  )}
+                  {paymentMethod === 'Wallet' && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-3">
+                      <label className="block text-sm text-white/80">Wallet Mobile Number</label>
+                      <input type="text" placeholder="10-digit mobile number" maxLength="10" className="w-full bg-white/5 border-2 border-orange-500/20 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none transition-colors" value={paymentDetails.walletNumber} onChange={(e) => setPaymentDetails({...paymentDetails, walletNumber: e.target.value})} />
                     </motion.div>
                   )}
                   <motion.button onClick={processPayment} className="w-full py-4 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full font-bold text-lg shadow-lg" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>Pay ₹{selectedPlan.price}</motion.button>
